@@ -1,0 +1,491 @@
+DATA MINING AND VISUALIZATION (DMV) PRACTICAL CODES
+====================================================
+Expanded versions - beginner-friendly, traditional Python.
+
+Install libraries:
+pip install pandas numpy matplotlib seaborn requests openpyxl scikit-learn
+
+GENERAL:
+1. Keep the datasets in the same folder as your notebook.
+2. Replace a filename or column name only if your actual file differs.
+3. Run each assignment separately.
+4. Assignment 8 needs an active internet connection and an API key.
+
+============================================================
+DMV 1. DATA LOADING, STORAGE AND FILE FORMATS
+SALES DATA - CSV, EXCEL AND JSON
+============================================================
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Load the same sales records from three file formats.
+df1 = pd.read_csv("sales.csv")
+df2 = pd.read_excel("sales.xlsx")
+df3 = pd.read_json("sales.json")
+
+print("CSV data:")
+print(df1.head())
+print("Excel data:")
+print(df2.head())
+print("JSON data:")
+print(df3.head())
+
+print("CSV information:")
+print(df1.info())
+print("Missing values:")
+print(df1.isnull().sum())
+print("Duplicate rows:", df1.duplicated().sum())
+
+# Combine records into one DataFrame.
+df = pd.concat([df1, df2, df3], ignore_index=True)
+
+# Remove duplicate records and clean missing values.
+df = df.drop_duplicates()
+df["Quantity"] = df["Quantity"].fillna(df["Quantity"].median())
+df["Price"] = df["Price"].fillna(df["Price"].median())
+df["Product"] = df["Product"].fillna("Unknown")
+df["Category"] = df["Category"].fillna("Unknown")
+
+# Create a calculated column.
+df["Total_Sales"] = df["Quantity"] * df["Price"]
+
+print("Cleaned data:")
+print(df.head())
+print("Summary statistics:")
+print(df.describe())
+
+# Aggregate sales by product and category.
+product_sales = df.groupby("Product")["Total_Sales"].sum()
+category_sales = df.groupby("Category")["Total_Sales"].sum()
+
+print("Sales by product:")
+print(product_sales)
+print("Sales by category:")
+print(category_sales)
+
+product_sales.plot(kind="bar", title="Sales by Product")
+plt.xlabel("Product")
+plt.ylabel("Total Sales")
+plt.tight_layout()
+plt.show()
+
+category_sales.plot(kind="pie", autopct="%1.1f%%")
+plt.title("Sales by Category")
+plt.ylabel("")
+plt.show()
+
+df["Total_Sales"].plot(kind="box", title="Sales Distribution")
+plt.show()
+
+# Save cleaned data in all three formats.
+df.to_csv("clean_sales.csv", index=False)
+df.to_excel("clean_sales.xlsx", index=False)
+df.to_json("clean_sales.json", orient="records")
+
+
+============================================================
+DMV 2. INTERACTING WITH WEB APIs
+OPENWEATHERMAP WEATHER DATA
+============================================================
+import requests
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Obtain an API key from OpenWeatherMap and paste it here.
+api_key = "YOUR_API_KEY"
+city = "Pune"
+
+url = "https://api.openweathermap.org/data/2.5/forecast"
+params = {
+    "q": city,
+    "appid": api_key,
+    "units": "metric"
+}
+
+response = requests.get(url, params=params, timeout=20)
+print("Status code:", response.status_code)
+
+if response.status_code == 200:
+    data = response.json()
+    weather_list = data["list"]
+
+    date = []
+    temperature = []
+    humidity = []
+    wind_speed = []
+    rain = []
+
+    for item in weather_list:
+        date.append(item["dt_txt"])
+        temperature.append(item["main"]["temp"])
+        humidity.append(item["main"]["humidity"])
+        wind_speed.append(item["wind"]["speed"])
+
+        if "rain" in item and "3h" in item["rain"]:
+            rain.append(item["rain"]["3h"])
+        else:
+            rain.append(0)
+
+    df = pd.DataFrame({
+        "Date": date,
+        "Temperature": temperature,
+        "Humidity": humidity,
+        "Wind_Speed": wind_speed,
+        "Rain": rain
+    })
+
+    print(df.head())
+    print("Missing values:")
+    print(df.isnull().sum())
+    print("Weather statistics:")
+    print(df.describe())
+
+    # Convert date to datetime and sort.
+    df["Date"] = pd.to_datetime(df["Date"])
+    df = df.sort_values("Date")
+
+    # Line chart for temperature.
+    plt.plot(df["Date"], df["Temperature"], marker="o")
+    plt.xlabel("Date")
+    plt.ylabel("Temperature in Celsius")
+    plt.title("Temperature Forecast")
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.show()
+
+    # Bar chart for humidity.
+    plt.bar(df["Date"].astype(str), df["Humidity"])
+    plt.xlabel("Date")
+    plt.ylabel("Humidity")
+    plt.title("Humidity Forecast")
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.show()
+
+    # Scatter plot for temperature and humidity.
+    plt.scatter(df["Temperature"], df["Humidity"])
+    plt.xlabel("Temperature")
+    plt.ylabel("Humidity")
+    plt.title("Temperature vs Humidity")
+    plt.show()
+
+    print("Correlation:")
+    print(df[["Temperature", "Humidity", "Wind_Speed", "Rain"]].corr())
+
+    df.to_csv("weather_data.csv", index=False)
+
+else:
+    print("API request failed.")
+    print(response.text)
+
+
+============================================================
+DMV 3. DATA CLEANING AND PREPARATION
+TELECOM CUSTOMER CHURN DATASET
+============================================================
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+df = pd.read_csv("Telco-Customer-Churn.csv")
+
+print(df.head())
+print(df.info())
+print("Missing values:")
+print(df.isnull().sum())
+print("Duplicate rows:", df.duplicated().sum())
+
+# Remove duplicate rows.
+df = df.drop_duplicates()
+
+# Convert TotalCharges from text to numeric.
+df["TotalCharges"] = pd.to_numeric(df["TotalCharges"], errors="coerce")
+
+# Fill missing numerical values with median.
+df["TotalCharges"] = df["TotalCharges"].fillna(df["TotalCharges"].median())
+
+# Remove customer ID because it is not useful for prediction.
+df = df.drop("customerID", axis=1)
+
+# Convert target column into 0 and 1.
+df["Churn"] = df["Churn"].map({"No": 0, "Yes": 1})
+
+# Convert text categories into numeric dummy columns.
+df = pd.get_dummies(df, drop_first=True, dtype=int)
+
+print("Cleaned data:")
+print(df.head())
+print("Missing values after cleaning:")
+print(df.isnull().sum())
+
+# Separate independent and dependent variables.
+X = df.drop("Churn", axis=1)
+y = df["Churn"]
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+# Scale the numerical columns.
+numeric_cols = ["tenure", "MonthlyCharges", "TotalCharges"]
+
+scaler = StandardScaler()
+X_train = X_train.copy()
+X_test = X_test.copy()
+
+X_train[numeric_cols] = scaler.fit_transform(X_train[numeric_cols])
+X_test[numeric_cols] = scaler.transform(X_test[numeric_cols])
+
+print("Training data shape:", X_train.shape)
+print("Testing data shape:", X_test.shape)
+
+# Simple plots for churn distribution.
+df["Churn"].value_counts().plot(kind="bar")
+plt.title("Customer Churn Count")
+plt.xlabel("Churn (0 = No, 1 = Yes)")
+plt.ylabel("Number of Customers")
+plt.show()
+
+# Export the cleaned dataset.
+df.to_csv("cleaned_telecom_churn.csv", index=False)
+
+
+============================================================
+DMV 4. DATA WRANGLING
+BENGALURU HOUSE DATASET
+============================================================
+import pandas as pd
+import matplotlib.pyplot as plt
+
+df = pd.read_csv("Bengaluru_House_Data.csv")
+
+print(df.head())
+print(df.info())
+print("Missing values:")
+print(df.isnull().sum())
+
+# Remove columns not required for this analysis.
+df = df.drop(["availability", "society"], axis=1)
+
+# Fill missing values.
+df["location"] = df["location"].fillna("Unknown")
+df["size"] = df["size"].fillna(df["size"].mode()[0])
+df["bath"] = df["bath"].fillna(df["bath"].median())
+df["balcony"] = df["balcony"].fillna(df["balcony"].median())
+
+# Extract number of bedrooms from values such as 2 BHK or 4 Bedroom.
+df["bhk"] = df["size"].str.split(" ").str[0]
+df["bhk"] = pd.to_numeric(df["bhk"], errors="coerce")
+
+# Convert total_sqft to numeric. For a range, take the average.
+def convert_sqft(value):
+    value = str(value)
+
+    if "-" in value:
+        parts = value.split("-")
+        return (float(parts[0]) + float(parts[1])) / 2
+
+    try:
+        return float(value)
+    except:
+        return None
+
+df["total_sqft"] = df["total_sqft"].apply(convert_sqft)
+
+# Remove rows with invalid values.
+df = df.dropna(subset=["total_sqft", "price", "bhk"])
+df = df[df["total_sqft"] > 0]
+
+# Derive price per square foot.
+df["price_per_sqft"] = df["price"] * 100000 / df["total_sqft"]
+
+print("Cleaned data:")
+print(df.head())
+print(df.describe())
+
+# Filter houses with at least one bedroom.
+df = df[df["bhk"] >= 1]
+
+# Average price by location.
+location_price = df.groupby("location")["price"].mean()
+location_price = location_price.sort_values(ascending=False)
+
+print("Top 10 locations by average price:")
+print(location_price.head(10))
+
+location_price.head(10).plot(kind="bar")
+plt.title("Average House Price by Location")
+plt.xlabel("Location")
+plt.ylabel("Average Price")
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+
+# Average price by BHK.
+bhk_price = df.groupby("bhk")["price"].mean()
+print("Average price by BHK:")
+print(bhk_price)
+
+bhk_price.plot(kind="bar")
+plt.title("Average Price by BHK")
+plt.xlabel("BHK")
+plt.ylabel("Average Price")
+plt.show()
+
+# Save cleaned data.
+df.to_csv("cleaned_bengaluru_housing.csv", index=False)
+
+
+============================================================
+DMV 5. DATA VISUALIZATION
+CITY AIR QUALITY DATASET
+============================================================
+import pandas as pd
+import matplotlib.pyplot as plt
+
+df = pd.read_csv("City_Air_Quality.csv")
+
+print(df.head())
+print(df.info())
+print("Missing values:")
+print(df.isnull().sum())
+
+# This code assumes the date column is named Date.
+df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+df = df.dropna(subset=["Date"])
+
+# Common pollutant columns in the air-quality dataset.
+cols = ["so2", "no2", "rspm", "spm"]
+
+# Convert pollutant columns to numeric.
+df["so2"] = pd.to_numeric(df["so2"], errors="coerce")
+df["no2"] = pd.to_numeric(df["no2"], errors="coerce")
+df["rspm"] = pd.to_numeric(df["rspm"], errors="coerce")
+df["spm"] = pd.to_numeric(df["spm"], errors="coerce")
+
+# Fill missing pollutant values with their median.
+df["so2"] = df["so2"].fillna(df["so2"].median())
+df["no2"] = df["no2"].fillna(df["no2"].median())
+df["rspm"] = df["rspm"].fillna(df["rspm"].median())
+df["spm"] = df["spm"].fillna(df["spm"].median())
+
+print("Pollutant statistics:")
+print(df[cols].describe())
+
+# Sort by date before plotting trends.
+df = df.sort_values("Date")
+
+# Line chart: SO2 and NO2 over time.
+plt.plot(df["Date"], df["so2"], label="SO2")
+plt.plot(df["Date"], df["no2"], label="NO2")
+plt.xlabel("Date")
+plt.ylabel("Pollutant Level")
+plt.title("Air Quality Trend")
+plt.legend()
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+
+# Bar chart: average pollutant levels.
+df[cols].mean().plot(kind="bar")
+plt.title("Average Pollutant Levels")
+plt.xlabel("Pollutant")
+plt.ylabel("Average Level")
+plt.show()
+
+# Box plot: pollutant distribution.
+df[cols].plot(kind="box")
+plt.title("Pollutant Distribution")
+plt.ylabel("Pollutant Level")
+plt.show()
+
+# Scatter plot: relationship between SO2 and NO2.
+plt.scatter(df["so2"], df["no2"])
+plt.xlabel("SO2")
+plt.ylabel("NO2")
+plt.title("SO2 vs NO2")
+plt.show()
+
+# Correlation matrix.
+print("Correlation:")
+print(df[cols].corr())
+
+# NOTE: This dataset/code does not calculate AQI unless an AQI
+# column or the required AQI formula is supplied.
+
+
+============================================================
+DMV 6. DATA AGGREGATION
+RETAIL SALES DATASET
+============================================================
+import pandas as pd
+import matplotlib.pyplot as plt
+
+df = pd.read_csv("Retail_Sales_data.csv")
+
+print(df.head())
+print(df.info())
+print("Missing values:")
+print(df.isnull().sum())
+
+# Calculate sales amount using quantity and price.
+df["quantity"] = pd.to_numeric(df["quantity"], errors="coerce")
+df["price"] = pd.to_numeric(df["price"], errors="coerce")
+df["quantity"] = df["quantity"].fillna(0)
+df["price"] = df["price"].fillna(0)
+df["sales_amount"] = df["quantity"] * df["price"]
+
+# Total sales by shopping mall.
+sales = df.groupby("shopping_mall")["sales_amount"].sum()
+print("Total sales by shopping mall:")
+print(sales)
+
+# Find the mall with the highest sales.
+print("Highest sales mall:", sales.idxmax())
+print("Highest sales amount:", sales.max())
+
+# Group sales by mall and category.
+mall_category = df.groupby(
+    ["shopping_mall", "category"]
+)["sales_amount"].sum()
+
+print("Sales by mall and category:")
+print(mall_category)
+
+# Bar chart of total sales by mall.
+sales.plot(kind="bar")
+plt.title("Sales by Shopping Mall")
+plt.xlabel("Shopping Mall")
+plt.ylabel("Total Sales")
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+
+# Pie chart of sales share by mall.
+sales.plot(kind="pie", autopct="%1.1f%%")
+plt.title("Sales Share by Shopping Mall")
+plt.ylabel("")
+plt.show()
+
+# Category-wise sales.
+category_sales = df.groupby("category")["sales_amount"].sum()
+print("Sales by category:")
+print(category_sales)
+
+category_sales.plot(kind="bar")
+plt.title("Sales by Category")
+plt.xlabel("Category")
+plt.ylabel("Total Sales")
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+
+# Export the grouped results.
+sales.to_csv("sales_by_shopping_mall.csv")
+category_sales.to_csv("sales_by_category.csv")
+
+
+============================================================
+END OF DMV CODES
+============================================================

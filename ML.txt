@@ -1,0 +1,494 @@
+MACHINE LEARNING PRACTICAL CODES
+================================
+Expanded versions - beginner-friendly, traditional Python.
+Install libraries:
+pip install pandas numpy matplotlib scikit-learn
+
+GENERAL:
+1. Keep dataset files in the same folder as your notebook.
+2. Change filenames/column names only if your dataset uses different names.
+3. Run one practical at a time.
+4. Do not include the target/output column in X.
+
+============================================================
+ML 1A. PCA ON WINE DATASET
+============================================================
+# PCA reduces many features into fewer principal components.
+
+from sklearn.datasets import load_wine
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+import matplotlib.pyplot as plt
+
+wine = load_wine()
+X = wine.data
+y = wine.target
+
+print("Original data shape:", X.shape)
+
+# Standardize the data because PCA is affected by feature scale.
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# Reduce the dataset to two principal components.
+pca = PCA(n_components=2)
+X_pca = pca.fit_transform(X_scaled)
+
+print("Reduced data shape:", X_pca.shape)
+print("Explained variance ratio:", pca.explained_variance_ratio_)
+print("Total explained variance:", sum(pca.explained_variance_ratio_))
+
+plt.figure(figsize=(8, 5))
+plt.scatter(X_pca[:, 0], X_pca[:, 1], c=y, cmap="viridis")
+plt.xlabel("Principal Component 1")
+plt.ylabel("Principal Component 2")
+plt.title("PCA on Wine Dataset")
+plt.colorbar(label="Wine class")
+plt.show()
+
+
+============================================================
+ML 1B. LDA ON IRIS DATASET
+============================================================
+# LDA is a supervised dimensionality reduction technique.
+
+from sklearn.datasets import load_iris
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.metrics import accuracy_score, confusion_matrix
+import matplotlib.pyplot as plt
+
+iris = load_iris()
+X = iris.data
+y = iris.target
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+
+# LDA transforms the features into two components.
+lda = LinearDiscriminantAnalysis(n_components=2)
+X_train_lda = lda.fit_transform(X_train, y_train)
+X_test_lda = lda.transform(X_test)
+
+# Train a classifier on the transformed data.
+model = LinearDiscriminantAnalysis()
+model.fit(X_train_lda, y_train)
+y_pred = model.predict(X_test_lda)
+
+print("Accuracy:", accuracy_score(y_test, y_pred))
+print("Confusion Matrix:")
+print(confusion_matrix(y_test, y_pred))
+
+plt.scatter(X_train_lda[:, 0], X_train_lda[:, 1], c=y_train)
+plt.xlabel("LDA Component 1")
+plt.ylabel("LDA Component 2")
+plt.title("LDA on Iris Dataset")
+plt.show()
+
+
+============================================================
+ML 2. UBER FARE PREDICTION - REGRESSION
+============================================================
+# Predict fare_amount using pickup/drop coordinates and time details.
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression, Ridge, Lasso
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+
+df = pd.read_csv("uber.csv")
+
+print(df.head())
+print(df.info())
+print("Missing values:")
+print(df.isnull().sum())
+
+# Remove invalid/missing records.
+df = df.dropna(subset=[
+    "fare_amount", "pickup_datetime", "pickup_longitude",
+    "pickup_latitude", "dropoff_longitude",
+    "dropoff_latitude", "passenger_count"
+])
+df = df[df["fare_amount"] > 0]
+df = df[df["passenger_count"] > 0]
+
+# Convert pickup time and create useful time features.
+df["pickup_datetime"] = pd.to_datetime(
+    df["pickup_datetime"], errors="coerce", utc=True
+)
+df = df.dropna(subset=["pickup_datetime"])
+
+df["hour"] = df["pickup_datetime"].dt.hour
+df["day"] = df["pickup_datetime"].dt.day
+df["month"] = df["pickup_datetime"].dt.month
+df["year"] = df["pickup_datetime"].dt.year
+
+# Remove extremely unreasonable coordinate values.
+df = df[
+    (df["pickup_longitude"].between(-180, 180)) &
+    (df["dropoff_longitude"].between(-180, 180)) &
+    (df["pickup_latitude"].between(-90, 90)) &
+    (df["dropoff_latitude"].between(-90, 90))
+]
+
+X = df[[
+    "pickup_longitude", "pickup_latitude",
+    "dropoff_longitude", "dropoff_latitude",
+    "passenger_count", "hour", "day", "month", "year"
+]]
+y = df["fare_amount"]
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+
+# Linear Regression
+model = LinearRegression()
+model.fit(X_train, y_train)
+y_pred = model.predict(X_test)
+
+print("LINEAR REGRESSION")
+print("MAE:", mean_absolute_error(y_test, y_pred))
+print("MSE:", mean_squared_error(y_test, y_pred))
+print("RMSE:", np.sqrt(mean_squared_error(y_test, y_pred)))
+print("R2 Score:", r2_score(y_test, y_pred))
+
+# Ridge Regression
+ridge = Ridge()
+ridge.fit(X_train, y_train)
+ridge_pred = ridge.predict(X_test)
+print("Ridge R2:", r2_score(y_test, ridge_pred))
+
+# Lasso Regression
+lasso = Lasso()
+lasso.fit(X_train, y_train)
+lasso_pred = lasso.predict(X_test)
+print("Lasso R2:", r2_score(y_test, lasso_pred))
+
+plt.scatter(y_test, y_pred)
+plt.xlabel("Actual Fare")
+plt.ylabel("Predicted Fare")
+plt.title("Actual vs Predicted Uber Fare")
+plt.show()
+
+
+============================================================
+ML 3A. K-NEAREST NEIGHBOURS - SOCIAL NETWORK ADS
+============================================================
+# Predict whether a customer purchases an advertised product.
+
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import confusion_matrix, accuracy_score
+from sklearn.metrics import precision_score, recall_score, classification_report
+
+df = pd.read_csv("Social_Network_Ads.csv")
+
+print(df.head())
+print(df.isnull().sum())
+
+X = df[["Age", "EstimatedSalary"]]
+y = df["Purchased"]
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.25, random_state=0, stratify=y
+)
+
+# KNN uses distances, so scaling is important.
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+
+knn = KNeighborsClassifier(n_neighbors=5)
+knn.fit(X_train, y_train)
+y_pred = knn.predict(X_test)
+
+print("Confusion Matrix:")
+print(confusion_matrix(y_test, y_pred))
+print("Accuracy:", accuracy_score(y_test, y_pred))
+print("Error Rate:", 1 - accuracy_score(y_test, y_pred))
+print("Precision:", precision_score(y_test, y_pred))
+print("Recall:", recall_score(y_test, y_pred))
+print("Classification Report:")
+print(classification_report(y_test, y_pred))
+
+
+============================================================
+ML 3B. SVM - HANDWRITTEN DIGITS DATASET
+============================================================
+# Classify handwritten digits from 0 to 9.
+
+from sklearn.datasets import load_digits
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+import matplotlib.pyplot as plt
+
+digits = load_digits()
+X = digits.data
+y = digits.target
+
+print("Dataset shape:", X.shape)
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+
+model = SVC(kernel="linear")
+model.fit(X_train, y_train)
+y_pred = model.predict(X_test)
+
+print("Accuracy:", accuracy_score(y_test, y_pred))
+print("Confusion Matrix:")
+print(confusion_matrix(y_test, y_pred))
+print(classification_report(y_test, y_pred))
+
+# Display one sample digit.
+plt.imshow(digits.images[0], cmap="gray")
+plt.title("Sample Handwritten Digit: " + str(digits.target[0]))
+plt.axis("off")
+plt.show()
+
+
+============================================================
+ML 4. K-MEANS CLUSTERING ON IRIS - ELBOW METHOD
+============================================================
+# Find a suitable number of clusters using WCSS.
+
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import silhouette_score
+
+df = pd.read_csv("Iris.csv")
+print(df.head())
+
+# Common Iris.csv structure. Do not include Id or Species in X.
+X = df[[
+    "SepalLengthCm", "SepalWidthCm",
+    "PetalLengthCm", "PetalWidthCm"
+]]
+
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+wcss = []
+
+for i in range(1, 11):
+    kmeans = KMeans(n_clusters=i, random_state=42, n_init=10)
+    kmeans.fit(X_scaled)
+    wcss.append(kmeans.inertia_)
+
+plt.plot(range(1, 11), wcss, marker="o")
+plt.xlabel("Number of Clusters")
+plt.ylabel("WCSS")
+plt.title("Elbow Method")
+plt.xticks(range(1, 11))
+plt.show()
+
+# Iris commonly forms three clusters.
+kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
+y_pred = kmeans.fit_predict(X_scaled)
+
+df["Cluster"] = y_pred
+print(df[["Cluster"]].value_counts())
+print("Silhouette Score:", silhouette_score(X_scaled, y_pred))
+
+plt.scatter(X_scaled[:, 0], X_scaled[:, 1], c=y_pred, cmap="viridis")
+plt.xlabel("Sepal Length (scaled)")
+plt.ylabel("Sepal Width (scaled)")
+plt.title("K-Means Clusters")
+plt.show()
+
+
+============================================================
+ML 5. RANDOM FOREST - CAR EVALUATION DATASET
+============================================================
+# Predict car acceptability: unacc, acc, good or vgood.
+
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+
+cols = [
+    "buying", "maint", "doors", "persons",
+    "lug_boot", "safety", "class"
+]
+
+df = pd.read_csv("car_evaluation.csv", names=cols)
+
+print(df.head())
+print(df["class"].value_counts())
+
+# Encode each categorical column.
+le_buying = LabelEncoder()
+df["buying"] = le_buying.fit_transform(df["buying"])
+
+le_maint = LabelEncoder()
+df["maint"] = le_maint.fit_transform(df["maint"])
+
+le_doors = LabelEncoder()
+df["doors"] = le_doors.fit_transform(df["doors"])
+
+le_persons = LabelEncoder()
+df["persons"] = le_persons.fit_transform(df["persons"])
+
+le_lug = LabelEncoder()
+df["lug_boot"] = le_lug.fit_transform(df["lug_boot"])
+
+le_safety = LabelEncoder()
+df["safety"] = le_safety.fit_transform(df["safety"])
+
+le_class = LabelEncoder()
+df["class"] = le_class.fit_transform(df["class"])
+
+X = df[["buying", "maint", "doors", "persons", "lug_boot", "safety"]]
+y = df["class"]
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
+y_pred = model.predict(X_test)
+
+print("Accuracy:", accuracy_score(y_test, y_pred))
+print("Confusion Matrix:")
+print(confusion_matrix(y_test, y_pred))
+print("Classification Report:")
+print(classification_report(y_test, y_pred, target_names=le_class.classes_))
+
+
+============================================================
+ML 6. TIC-TAC-TOE - BASIC Q-LEARNING
+============================================================
+# Tabular Q-learning agent trained against a random opponent.
+# This is a simple demonstration of states, actions, rewards and Q updates.
+
+import random
+import numpy as np
+
+Q = {}
+alpha = 0.1
+gamma = 0.9
+epsilon = 0.2
+
+def get_q_values(state):
+    if state not in Q:
+        Q[state] = np.zeros(9)
+    return Q[state]
+
+def check_winner(board, mark):
+    wins = [
+        [0, 1, 2], [3, 4, 5], [6, 7, 8],
+        [0, 3, 6], [1, 4, 7], [2, 5, 8],
+        [0, 4, 8], [2, 4, 6]
+    ]
+
+    for line in wins:
+        if (board[line[0]] == mark and
+            board[line[1]] == mark and
+            board[line[2]] == mark):
+            return True
+    return False
+
+def choose_action(state, available):
+    q_values = get_q_values(state)
+
+    if random.random() < epsilon:
+        return random.choice(available)
+
+    best_action = available[0]
+    for action in available:
+        if q_values[action] > q_values[best_action]:
+            best_action = action
+    return best_action
+
+# Train for multiple episodes.
+for episode in range(5000):
+    board = [" "] * 9
+    state = "".join(board)
+    done = False
+
+    while not done:
+        available = []
+        for i in range(9):
+            if board[i] == " ":
+                available.append(i)
+
+        if len(available) == 0:
+            break
+
+        action = choose_action(state, available)
+        board[action] = "X"
+
+        if check_winner(board, "X"):
+            reward = 1
+            done = True
+        else:
+            opponent_moves = []
+            for i in range(9):
+                if board[i] == " ":
+                    opponent_moves.append(i)
+
+            if len(opponent_moves) == 0:
+                reward = 0
+                done = True
+            else:
+                opponent_action = random.choice(opponent_moves)
+                board[opponent_action] = "O"
+
+                if check_winner(board, "O"):
+                    reward = -1
+                    done = True
+                else:
+                    reward = 0
+
+        next_state = "".join(board)
+        current_q = get_q_values(state)
+        next_q = get_q_values(next_state)
+
+        if done:
+            current_q[action] = current_q[action] + alpha * (
+                reward - current_q[action]
+            )
+        else:
+            next_available = []
+            for i in range(9):
+                if board[i] == " ":
+                    next_available.append(i)
+
+            if len(next_available) > 0:
+                max_next = next_q[next_available[0]]
+                for a in next_available:
+                    if next_q[a] > max_next:
+                        max_next = next_q[a]
+
+                current_q[action] = current_q[action] + alpha * (
+                    reward + gamma * max_next - current_q[action]
+                )
+
+        state = next_state
+
+print("Q-learning training completed.")
+print("Number of learned states:", len(Q))
