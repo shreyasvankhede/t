@@ -492,3 +492,88 @@ for episode in range(5000):
 
 print("Q-learning training completed.")
 print("Number of learned states:", len(Q))
+
+
+# Play Tic-Tac-Toe against the trained AI.
+# The AI uses X and plays first. You play O.
+def display_board(board):
+    print()
+    print(" " + board[0] + " | " + board[1] + " | " + board[2])
+    print("---+---+---")
+    print(" " + board[3] + " | " + board[4] + " | " + board[5])
+    print("---+---+---")
+    print(" " + board[6] + " | " + board[7] + " | " + board[8])
+    print()
+
+
+def play_tic_tac_toe():
+    global epsilon
+
+    board = [" "] * 9
+    old_epsilon = epsilon
+    epsilon = 0  # Make the AI choose its best learned move.
+
+    print("\\nTic-Tac-Toe: Enter a position from 1 to 9.")
+    print("Positions:")
+    print(" 1 | 2 | 3")
+    print("---+---+---")
+    print(" 4 | 5 | 6")
+    print("---+---+---")
+    print(" 7 | 8 | 9")
+    print("\\nThe AI is X and plays first. You are O.")
+
+    while True:
+        # AI's turn
+        state = "".join(board)
+        available = []
+        for i in range(9):
+            if board[i] == " ":
+                available.append(i)
+
+        if len(available) == 0:
+            print("It is a draw!")
+            break
+
+        ai_move = choose_action(state, available)
+        board[ai_move] = "X"
+        print("\\nAI played position", ai_move + 1)
+        display_board(board)
+
+        if check_winner(board, "X"):
+            print("AI wins!")
+            break
+
+        available = []
+        for i in range(9):
+            if board[i] == " ":
+                available.append(i)
+
+        if len(available) == 0:
+            print("It is a draw!")
+            break
+
+        # Human's turn
+        while True:
+            try:
+                user_move = int(input("Enter your position (1-9): ")) - 1
+                if user_move < 0 or user_move > 8:
+                    print("Enter a number between 1 and 9.")
+                elif board[user_move] != " ":
+                    print("That position is already occupied. Try again.")
+                else:
+                    break
+            except ValueError:
+                print("Please enter a valid number.")
+
+        board[user_move] = "O"
+        display_board(board)
+
+        if check_winner(board, "O"):
+            print("Congratulations! You win!")
+            break
+
+    epsilon = old_epsilon
+
+
+# Run this function whenever you want to play against the trained AI.
+# play_tic_tac_toe()
